@@ -1,0 +1,53 @@
+let
+    GetAutoHoliday = (P_StartDate,P_EndDate,P_Culture,P_IsCarnivalHoliday) => 
+    let 
+		
+		Holiday = if P_Culture = "pt-PT" then "Feriado" else "Holiday",
+		
+		H_NewYear = if P_Culture = "pt-PT" then "Dia de Ano Novo" else "New Year's Day",
+		H_Liberty = if P_Culture = "pt-PT" then "Dia da Liberdade" else "Liberty Day",
+		H_LaborDay = if P_Culture = "pt-PT" then "Dia do Trabalhador" else "Labor Day",
+		H_Portugal = if P_Culture = "pt-PT" then "Dia de Portugal" else "Portugal's Day",
+		H_Assumption = if P_Culture = "pt-PT" then "Assunção da Nossa Senhora" else "Assumption of Mary",
+		H_Republic = if P_Culture = "pt-PT" then "Implantação da Republica" else "Republic Implantation",
+		H_AllSaints = if P_Culture = "pt-PT" then "Dia de Todos os Santos" else "All Saints' Day",
+		H_Independence = if P_Culture = "pt-PT" then "Restauração da Independência" else "Restoration of Independence",
+		H_Conceicao = if P_Culture = "pt-PT" then "Imaculada Conceição" else "Feast of the Immaculate Conception",
+		H_XMas = if P_Culture = "pt-PT" then "Natal" else "Christmas",
+		H_Easter = if P_Culture = "pt-PT" then "Páscoa" else "Easter",
+		H_Carnival = if P_Culture = "pt-PT" then "Carnaval" else "Carnival",
+		H_HolyFriday = if P_Culture = "pt-PT" then "6ª Feira Santa" else "Good Friday",
+		H_GodBody = if P_Culture = "pt-PT" then "Corpo de Deus" else "Corpus Christi",
+		
+		 fnCalcEaster = (year) => let
+			C = Number.RoundDown(year/100),
+			N = year - 19*Number.RoundDown((year/19)),
+			K = Number.RoundDown((C-17)/25),
+			I = C - Number.RoundDown(C/4) - Number.RoundDown((C-K)/3) + (19*N) + 15,
+			I1 = I - 30*Number.RoundDown((I/30)),
+			I2 = I1 - Number.RoundDown((I1/28))*Number.RoundDown((1-I1/28))*Number.RoundDown(29/(I1+1))*Number.RoundDown(((21-N)/11)),
+			J = year + Number.RoundDown(year/4) + I2 + 2 - C + Number.RoundDown(C/4),
+			J1 = J - 7*Number.RoundDown((J/7)),
+			L = I2 - J1,
+			Mes = 3 + Number.RoundDown((L+40)/44),
+			Dia = L + 28 - 31*Number.RoundDown((Mes/4)),
+			result = Date.FromText(Number.ToText(year) & "-" & Number.ToText(Number.RoundDown(Mes)) & "-" & Number.ToText(Number.RoundDown(Dia)))
+			in result,
+		
+		DayCount = Duration.Days(Duration.From(P_EndDate - P_StartDate)) + 1,
+		Source = List.Dates(P_StartDate,DayCount,#duration(1,0,0,0)),
+		TableFromList = Table.FromList(Source, Splitter.SplitByNothing()),
+		ChangedType = Table.TransformColumnTypes(TableFromList,{{"Column1", type date}}),
+		#"Renamed Columns" = Table.RenameColumns(ChangedType,{{"Column1", "Date"}}),
+	   InsertYear = Table.AddColumn(#"Renamed Columns", "Year", each Date.Year([Date])),
+
+
+		InsertHolidays = Table.AddColumn(InsertYear, "Holiday", each if [Date] = #date(Date.Year([Date]),1,1) then H_NewYear else if [Date] = #date(Date.Year([Date]),4,25) then H_Liberty else if [Date] = #date(Date.Year([Date]),5,1) then H_LaborDay else if [Date] = #date(Date.Year([Date]),6,10) then H_Portugal else if [Date] = #date(Date.Year([Date]),8,15) then H_Assumption else if ([Date] = #date(Date.Year([Date]),10,5) and not List.Contains({2013,2014,2015},[Year])) then H_Republic else if ([Date] = #date(Date.Year([Date]),11,1) and not List.Contains({2013,2014,2015},[Year])) then H_AllSaints else if ([Date] = #date(Date.Year([Date]),12,1) and not List.Contains({2013,2014,2015},[Year])) then H_Independence else if [Date] = #date(Date.Year([Date]),12,8) then H_Conceicao else if [Date] = #date(Date.Year([Date]),12,25) then H_XMas else if [Date] = fnCalcEaster(Date.Year([Date])) then H_Easter else if ([Date] = Date.AddDays(fnCalcEaster(Date.Year([Date])), -47) and P_IsCarnivalHoliday) then H_Carnival else if [Date] = Date.AddDays(fnCalcEaster(Date.Year([Date])), -2) then H_HolyFriday else if ([Date] = Date.AddDays(fnCalcEaster(Date.Year([Date])), 60) and not List.Contains({2013,2014,2015},[Year])) then H_GodBody else null),
+		#"Changed Type" = Table.TransformColumnTypes(InsertHolidays,{{"Holiday", type text}}),
+		#"Removed Columns" = Table.RemoveColumns(#"Changed Type",{"Year"}),
+		#"Filtered Rows" = Table.SelectRows(#"Removed Columns", each ([Holiday] <> null)),
+                #"Appended Query" = Table.Combine({#"Filtered Rows", HolidayManual})
+        in
+        #"Appended Query"
+in
+    GetAutoHoliday
